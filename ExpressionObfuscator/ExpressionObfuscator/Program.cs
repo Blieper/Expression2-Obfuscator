@@ -11,17 +11,41 @@ namespace ExpressionObfuscator {
 
         [STAThread]
         static void Main(string[] args) {
+
+            Console.WindowWidth = 180;
+            Console.WindowHeight = 60;
+
             var obfuscator = new Obfuscator();
 
-            OpenFileDialog fd = new OpenFileDialog();
-            fd.ShowDialog();
-            var code = File.ReadAllText(fd.FileName);
+            var fileDialog = new OpenFileDialog();
+            fileDialog.ShowDialog();
+            var code = File.ReadAllText(fileDialog.FileName);
 
             var obfuscatedCode = obfuscator.Obfuscate(code);
 
             Console.Write(obfuscatedCode);
 
-            Console.ReadKey();
+            Console.WriteLine("\n\nInsert file name, press enter to select folder to save in.");
+
+            string fileName = Console.ReadLine();
+
+            if (fileName.EndsWith(".txt")) {
+                fileName = fileName.Substring(0, fileName.LastIndexOf(".txt"));
+            }
+
+            SaveFileDialog sf = new SaveFileDialog {
+                FileName = fileName
+            };
+
+            if (sf.ShowDialog() == DialogResult.OK) {
+                string savePath = Path.GetDirectoryName(sf.FileName) + "\\" + fileName + ".txt";
+
+                File.WriteAllText(savePath, obfuscatedCode);
+                Console.WriteLine("Succesfully saved to: \n" + savePath);
+            }
+
+            Console.WriteLine("Press any key to quit.");
+            Console.Read();
         }
     }
 }
