@@ -59,7 +59,7 @@ namespace ExpressionObfuscator {
 
         private string DoNumbers (string code) {
             var newCode = code;
-            var regex = new Regex(@"(?<![\w.-])\d+(?![.])(?!\w)");
+            var regex = new Regex(@"(?<![\w.])\d+(?![.])(?!\w)");
             var matches = regex.Matches(code);
             var numList = new List<string>();
 
@@ -72,7 +72,7 @@ namespace ExpressionObfuscator {
             }
 
             foreach (var num in numList) {
-                newCode = new Regex(@"(?<![\w.-])" + num + @"(?![.])(?!\w)").Replace(newCode, "0x" + int.Parse(num).ToString("X"));
+                newCode = new Regex(@"(?<![\w.])" + num + @"(?![.])(?!\w)").Replace(newCode, "0x" + int.Parse(num).ToString("X"));
             }
 
             return newCode;
@@ -111,7 +111,6 @@ namespace ExpressionObfuscator {
 
             withoutDirs = Regex.Replace(withoutDirs, @"\s+", " ");
             withoutDirs = Regex.Replace(withoutDirs, @"\{", "{\n");
-            withoutDirs = Regex.Replace(withoutDirs, @"\(", "{\n");
 
             withoutDirs = withoutDirs.Trim();
 
