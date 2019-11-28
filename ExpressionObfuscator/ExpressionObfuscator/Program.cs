@@ -16,16 +16,26 @@ namespace ExpressionObfuscator {
             Console.WindowHeight = 60;
 
             var obfuscator = new Obfuscator();
+            string code = string.Empty;
 
-            var fileDialog = new OpenFileDialog();
-            fileDialog.ShowDialog();
-            var code = File.ReadAllText(fileDialog.FileName);
+            Console.WriteLine("Expression 2 Obfuscator --- Written by KrypteK");
+            Console.WriteLine("");
+
+            using (var fileDialog = new OpenFileDialog()) {
+                fileDialog.ShowDialog();
+
+                if (!string.IsNullOrEmpty(fileDialog.FileName)) {
+                    code = File.ReadAllText(fileDialog.FileName);
+                } else {
+                    return;
+                }
+            }
 
             var obfuscatedCode = obfuscator.Obfuscate(code);
 
             Console.Write(obfuscatedCode);
-
             Console.WriteLine("\n\nInsert file name, press enter to select folder to save in.");
+            Console.Write(">");
 
             string fileName = Console.ReadLine();
 
@@ -41,7 +51,8 @@ namespace ExpressionObfuscator {
                 string savePath = Path.GetDirectoryName(sf.FileName) + "\\" + fileName + ".txt";
 
                 File.WriteAllText(savePath, obfuscatedCode);
-                Console.WriteLine("Succesfully saved to: \n" + savePath);
+
+                Console.WriteLine("\nSuccesfully saved to: \n" + savePath);
             }
 
             Console.WriteLine("Press any key to quit.");

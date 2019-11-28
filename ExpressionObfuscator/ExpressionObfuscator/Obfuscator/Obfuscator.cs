@@ -7,57 +7,122 @@ using System.Text.RegularExpressions;
 
 namespace ExpressionObfuscator {
     class Obfuscator {
-        Dictionary<string, string> VariableNames = new Dictionary<string, string>();
-        Random random = new Random();
+        private readonly Dictionary<string, string> _variableNames = new Dictionary<string, string>();
+        private readonly List<string> _io = new List<string>();
+        private readonly Random _random = new Random();
+        private readonly string[] _operators = new string[] {
+            ",",
+            "*",
+            "+",
+            "-",
+            "/",
+            "%",
+            "^",
+            "<",
+            ">",
+            "?",
+            ":",
+            "(",
+            ")",
+            "&",
+            "|",
+            "=",
+            "{",
+            "}"
+        };
 
-        private string GenerateNameFor (string name) {
+        private void GetIO(string code) {
+            var dirRegex = new Regex(@"@(.*)\n?");
+            var nameRegex = new Regex(@"(?<!\w)([A-Z]([A-Za-z0-9_])*)(?!\w)");
+
+            foreach (var m in dirRegex.Matches(code)) {
+                var directive = m.ToString();
+
+                if (directive.StartsWith("@inputs") || directive.StartsWith("@outputs")) {
+                    foreach (var name in nameRegex.Matches(directive)) {
+                        _io.Add(name.ToString());
+                    }
+                }
+            }
+        }
+
+        private string DoDirectives(string code) {
+            var directives = "";
+            var dirRegex = new Regex(@"@(.*)\n?");
+
+            foreach (var m in dirRegex.Matches(code)) {
+                var directive = m.ToString();
+
+                if (directive.StartsWith("@persist")) {
+                    foreach (var name in _variableNames) {
+                        if (directive.Contains(name.Value)) {
+                            directive = Regex.Replace(directive, @"(?<!\w)" + name.Value + @"(?!\w)", name.Key);
+                        }
+                    }
+                }
+
+                directives += directive;
+            }
+
+            return directives;
+        }
+
+        private string GenerateNameFor(string name) {
+            if (_io.Contains(name)) return _io.Find(x => x == name);
+
             const string startChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             const string chars = "abcdefghijklmnopqrstuvwABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 
-            string generated = "" + startChars[random.Next(startChars.Length)];
+            string generated = "" + startChars[_random.Next(startChars.Length)];
 
-            generated += new string(Enumerable.Repeat(chars, random.Next(10))
-              .Select(s => s[random.Next(s.Length)]).ToArray());
+            generated += new string(Enumerable.Repeat(chars, _random.Next(32))
+              .Select(s => s[_random.Next(s.Length)]).ToArray());
 
-            if (VariableNames.ContainsKey(generated)) {
+            if (_variableNames.ContainsKey(generated)) {
                 return GenerateNameFor(name);
-            } else {
-                VariableNames[generated] = name;
+            }
+            else {
+                _variableNames[generated] = name;
                 return generated;
             }
         }
 
-        private string DoVarNames (string code) {
+        private string DoVarNames(string code) {
             var newCode = code;
             var regex = new Regex(@"[A-Z]([A-Za-z0-9_])*\s*=");
             var matches = regex.Matches(code);
             var nameList = new List<string>();
 
             foreach (var m in matches) {
-                var name = Regex.Replace(m.ToString(), @"\s*=","");
+                var name = Regex.Replace(m.ToString(), @"\s*=", "");
 
-                if (nameList.Find(x => x == name) == null) {
+                if (!nameList.Contains(name)) {
+                    Console.WriteLine(name);
+
                     nameList.Add(name);
                 }
             }
 
+            Console.WriteLine("\n\n");
+
             foreach (var name in nameList) {
-                var n = GenerateNameFor(name);
-                newCode = Regex.Replace(newCode, @"(?<!\w)" + name + @"(?!\w)", GenerateNameFor(name));
+                var newName = GenerateNameFor(name);
+
+                newCode = Regex.Replace(newCode, @"(?<!["".*])(?<!\w)" + name + @"(?!\w)(?![.*""])", newName);
             }
 
             return newCode;
         }
 
-        private string RemoveComments (string code) {
+        private string RemoveComments(string code) {
             var newCode = code;
-            newCode = Regex.Replace(newCode, @"#\[(.|\n)*\]#", "");
+            newCode = Regex.Replace(newCode, @"\#\[([^\[\]].|\n)*\]\#", "");
             newCode = Regex.Replace(newCode, @"#(.*)\n?", "");
 
             return newCode;
         }
 
-        private string DoNumbers (string code) {
+        private string DoNumbers(string code) {
             var newCode = code;
             var regex = new Regex(@"(?<![\w.])\d+(?![.])(?!\w)");
             var matches = regex.Matches(code);
@@ -68,7 +133,7 @@ namespace ExpressionObfuscator {
 
                 if (numList.Find(x => x == num) == null) {
                     numList.Add(num);
-                }         
+                }
             }
 
             foreach (var num in numList) {
@@ -78,43 +143,43 @@ namespace ExpressionObfuscator {
             return newCode;
         }
 
-        public string Obfuscate(string code) {
-            var namedir = "";
-            var dirRegex = new Regex(@"@name(.*)\n?");
-            var dirmatches = dirRegex.Matches(code);
+        private string RemoveWhiteSpace(string code) {
+            var newCode = code;
 
-            foreach (var m in dirmatches) {
-                namedir += m.ToString();
+            newCode = Regex.Replace(newCode, @"(?<!["".*]) +(?![.*""])", " ");
+
+            foreach (var op in _operators) {
+                string space = (op == ")" || op == "}") ? " " : "";
+
+                newCode = Regex.Replace(newCode, @"(?<!["".*])(\s*\" + op + @"\s+)(?![.*""])", op + space);
             }
 
-            string restCode = code.Substring(namedir.Length);
+            newCode = Regex.Replace(newCode, @"(?<!["".*])(\t|(\n|\r|\r\n))*(?![.*""])", "");
+
+            return newCode;
+        }
+
+
+
+        public string Obfuscate(string code) {
+            var directoryString = string.Empty;
+            var dirRegex = new Regex(@"@(.*)\n?");
+            foreach (var m in dirRegex.Matches(code)) directoryString += m.ToString();
+
+            string restCode = code.Substring(directoryString.Length);
+
+            GetIO(code);
 
             restCode = DoNumbers(restCode);
             restCode = DoVarNames(restCode);
             restCode = RemoveComments(restCode);
+            restCode = RemoveWhiteSpace(restCode);
 
-            restCode = Regex.Replace(restCode, @"\s*\}", "}");
-            restCode = Regex.Replace(restCode, @"\s*\)", ")");
+            Console.WriteLine(string.Join(",", _variableNames));
 
-            restCode = Regex.Replace(restCode, @"\{\s*", "{");
-            restCode = Regex.Replace(restCode, @"\(\s*", "(");
+            directoryString = DoDirectives(code);
 
-            var directives = "";
-            dirRegex = new Regex(@"@(.*)\n?");
-            dirmatches = dirRegex.Matches(restCode);
-
-            foreach (var m in dirmatches) {
-                directives += m.ToString();
-            }
-
-            string withoutDirs = restCode.Substring(directives.Length);
-
-            withoutDirs = Regex.Replace(withoutDirs, @"\s+", " ");
-            withoutDirs = Regex.Replace(withoutDirs, @"\{", "{\n");
-
-            withoutDirs = withoutDirs.Trim();
-
-            return namedir + (directives + withoutDirs);
+            return directoryString + restCode;
         }
     }
 }
